@@ -13,13 +13,12 @@ type Config struct {
 }
 
 func Load() *Config {
-
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
 
 	cfg := &Config{
-		DatabaseURL: getEnv("Database_URL", ""),
+		DatabaseURL: getEnv("DATABASE_URL", ""),
 		Port:        getEnv("PORT", ""),
 	}
 
