@@ -25,6 +25,8 @@ func main() {
 
 	router := handlers.NewRouter(todoHandler)
 
+	log.Printf("Listening on port %s", cfg.Port)
+
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
 		log.Fatalf("failed to start server: %v", err)
 	}
