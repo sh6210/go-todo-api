@@ -10,5 +10,5 @@
   -d postgres:16
 ```
 
-- Connecting DB: #Connect: docker exec -it todo-postgres psql -U postgres -d todo_db
+- Connecting DB: docker exec -it todo-postgres psql -U postgres -d todo_db
 
