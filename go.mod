@@ -1,4 +1,4 @@
-module github/sh6210/go-todo-api
+module github.com/sh6210/go-todo-api
 
 go 1.25.0
 
