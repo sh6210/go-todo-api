@@ -3,12 +3,15 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/validator/v10"
 	"github.com/sh6210/go-todo-api/internal/models"
 	"github.com/sh6210/go-todo-api/internal/repository"
+	"github.com/sh6210/go-todo-api/internal/validation"
 )
 
 type TodoHandler struct {
@@ -29,6 +32,35 @@ func respondError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
 }
 
+func respondValidationError(w http.ResponseWriter, err error) {
+	var validationErrors validator.ValidationErrors
+	if errors.As(err, &validationErrors) {
+		fieldErrors := make(map[string]string)
+		for _, fe := range validationErrors {
+			fieldErrors[fe.Field()] = validationMessage(fe)
+		}
+		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"error":  "validation failed",
+			"fields": fieldErrors,
+		})
+		return
+	}
+	respondError(w, http.StatusBadRequest, err.Error())
+}
+
+func validationMessage(fe validator.FieldError) string {
+	switch fe.Tag() {
+	case "required":
+		return "this field is required"
+	case "min":
+		return fmt.Sprintf("%s must be %s", fe.Field(), fe.Param())
+	case "max":
+		return fmt.Sprintf("%s must be %s", fe.Field(), fe.Param())
+	default:
+		return "invalid value"
+	}
+}
+
 func (h *TodoHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateTodoRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -36,8 +68,8 @@ func (h *TodoHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Title == "" {
-		respondError(w, http.StatusBadRequest, "title is required")
+	if err := validation.Validate.Struct(req); err != nil {
+		respondValidationError(w, err)
 		return
 	}
 
@@ -93,8 +125,8 @@ func (h *TodoHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Title == "" {
-		respondError(w, http.StatusBadRequest, "title is required")
+	if err := validation.Validate.Struct(req); err != nil {
+		respondValidationError(w, err)
 		return
 	}
 
