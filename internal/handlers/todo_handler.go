@@ -15,10 +15,10 @@ import (
 )
 
 type TodoHandler struct {
-	repo *repository.TodoRepository
+	repo TodoRepositoryInterface
 }
 
-func NewTodoHandler(repo *repository.TodoRepository) *TodoHandler {
+func NewTodoHandler(repo TodoRepositoryInterface) *TodoHandler {
 	return &TodoHandler{repo: repo}
 }
 
@@ -90,7 +90,7 @@ func (h *TodoHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	todo, err := h.repo.GetById(r.Context(), id)
+	todo, err := h.repo.GetByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, repository.ErrTodoNotFound) {
 			respondError(w, http.StatusNotFound, err.Error())

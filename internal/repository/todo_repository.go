@@ -45,7 +45,7 @@ func (r *TodoRepository) Create(ctx context.Context, title, description string) 
 	return &todo, nil
 }
 
-func (r *TodoRepository) GetById(ctx context.Context, id int) (*models.Todo, error) {
+func (r *TodoRepository) GetByID(ctx context.Context, id int) (*models.Todo, error) {
 	query := `SELECT id, title, description, completed, created_at, updated_at 
 				FROM todos
 				WHERE id = $1`
