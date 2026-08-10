@@ -102,14 +102,64 @@ func (h *TodoHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, todo)
 }
 
+// GetAll cursor based pagination | GET /todos?cursor=1&limit=10
 func (h *TodoHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	cursor := 0
+	limit := 10
+
+	if p := r.URL.Query().Get("cursor"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil {
+			cursor = parsed
+		}
+	}
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+
+	result, err := h.repo.GetAllCursor(r.Context(), cursor, limit)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, result)
+}
+
+// GET /todos?page=1&limit=10
+/*func (h *TodoHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	limit := 10
+
+	if p := r.URL.Query().Get("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil {
+			page = parsed
+		}
+	}
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+
+	result, err := h.repo.GetAllPaginated(r.Context(), page, limit)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}*/
+
+/*func (h *TodoHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	todos, err := h.repo.GetAll(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	respondJSON(w, http.StatusOK, todos)
-}
+}*/
 
 func (h *TodoHandler) Update(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")

@@ -18,6 +18,14 @@ type TodoRepository struct {
 	db *pgxpool.Pool
 }
 
+type PaginatedResult struct {
+	Todos      []models.Todo `json:"todos"`
+	Page       int           `json:"page"`
+	Limit      int           `json:"limit"`
+	TotalCount int           `json:"totalCount"`
+	TotalPages int           `json:"totalPages"`
+}
+
 func NewTodoRepository(db *pgxpool.Pool) *TodoRepository {
 	return &TodoRepository{db: db}
 }
@@ -104,6 +112,104 @@ func (r *TodoRepository) GetAll(ctx context.Context) ([]models.Todo, error) {
 		return nil, fmt.Errorf("failed to get todos: %w", err)
 	}
 
+	return todos, nil
+}
+
+func (r *TodoRepository) GetAllPaginated(ctx context.Context, page, limit int) (*PaginatedResult, error) {
+	offset := (page - 1) * limit
+
+	query := `
+		Select id, title, description, completed, created_at, updated_at
+FROM todos
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+			`
+
+	rows, err := r.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get todos: %w", err)
+	}
+	defer rows.Close()
+
+	var todos []models.Todo
+	for rows.Next() {
+		var todo models.Todo
+		if err := rows.Scan(
+			&todo.Id,
+			&todo.Title,
+			&todo.Description,
+			&todo.Completed,
+			&todo.CreatedAt,
+			&todo.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to query todos: %w", err)
+		}
+		todos = append(todos, todo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to get todos: %w", err)
+	}
+
+	var totalCount int
+	countQuery := `SELECT COUNT(*) FROM todos`
+	if err := r.db.QueryRow(ctx, countQuery).Scan(&totalCount); err != nil {
+		return nil, fmt.Errorf("failed to get todos: %w", err)
+	}
+
+	totalPages := (totalCount + limit - 1) / limit
+
+	return &PaginatedResult{
+		Todos:      todos,
+		Page:       page,
+		Limit:      limit,
+		TotalCount: totalCount,
+		TotalPages: totalPages,
+	}, nil
+}
+
+func (r *TodoRepository) GetAllCursor(ctx context.Context, cursor int, limit int) ([]models.Todo, error) {
+	var query string
+	var args []any
+
+	if cursor == 0 {
+		query = `SELECT id, title, description, completed, created_at, updated_at
+					FROM todos
+					ORDER BY id DESC
+					LIMIT $1`
+		args = []any{limit}
+	} else {
+		query = `Select Id, title, description, completed, created_at, updated_at
+					FROM todos
+					WHERE id < $1
+					ORDER BY created_at DESC
+					LIMIT $2`
+		args = []any{cursor, limit}
+	}
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get todos: %w", err)
+	}
+	defer rows.Close()
+
+	var todos []models.Todo
+	for rows.Next() {
+		var todo models.Todo
+		if err := rows.Scan(
+			&todo.Id,
+			&todo.Title,
+			&todo.Description,
+			&todo.Completed,
+			&todo.CreatedAt,
+			&todo.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to get todos: %w", err)
+		}
+		todos = append(todos, todo)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to get todos: %w", err)
+	}
 	return todos, nil
 }
 
