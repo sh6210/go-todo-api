@@ -15,4 +15,5 @@ type TodoRepositoryInterface interface {
 	GetAllCursor(ctx context.Context, cursor int, limit int) ([]models.Todo, error)
 	Update(ctx context.Context, id int, title, description string, completed bool) (*models.Todo, error)
 	Delete(ctx context.Context, id int) error
+	Archive(ctx context.Context, id int) error
 }

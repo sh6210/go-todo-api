@@ -35,6 +35,52 @@ func NewTodoRepository(db *pgxpool.Pool) *TodoRepository {
 	return &TodoRepository{db: db}
 }
 
+func (r *TodoRepository) Archive(ctx context.Context, id int) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to being transaction: %w", err)
+	}
+
+	defer tx.Rollback(ctx)
+
+	var todo models.Todo
+	getQuery := `
+				Select id, title, description, completed, created_at, updated_at
+				From todos
+				where id = $1`
+
+	err = tx.QueryRow(ctx, getQuery, id).Scan(
+		&todo.Id,
+		&todo.Title,
+		&todo.Description,
+		&todo.Completed,
+		&todo.CreatedAt,
+		&todo.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrTodoNotFound
+		}
+		return fmt.Errorf("failed to fetch: %w", err)
+	}
+
+	insertQuery := `INSERT INTO archived_todos (id, title, description, completed, created_at) values ($1, $2, $3, $4, $5)`
+
+	if _, err := tx.Exec(ctx, insertQuery, todo.Id, todo.Title, todo.Completed, todo.CreatedAt); err != nil {
+		return fmt.Errorf("failed to insert: %w", err)
+	}
+
+	deleteQuery := `DELETE FROM todos WHERE id = $1`
+	if _, err := tx.Exec(ctx, deleteQuery, id); err != nil {
+		return fmt.Errorf("failed to delete: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+	return nil
+}
+
 func (r *TodoRepository) BulkCreateCopy(ctx context.Context, items []BulkCreateInput) (int64, error) {
 	rows := make([][]any, len(items))
 	for i, item := range items {

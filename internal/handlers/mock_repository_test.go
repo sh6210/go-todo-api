@@ -15,6 +15,10 @@ type mockTodoRepository struct {
 	DeleteFunc  func(ctx context.Context, id int) error
 }
 
+func (m *mockTodoRepository) Archive(ctx context.Context, id int) error {
+	return m.Archive(ctx, id)
+}
+
 func (m *mockTodoRepository) Create(ctx context.Context, title, description string) (*models.Todo, error) {
 	return m.CreateFunc(ctx, title, description)
 }
