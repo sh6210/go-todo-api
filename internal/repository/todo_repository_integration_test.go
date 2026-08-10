@@ -30,6 +30,32 @@ func TestTodoRepository_Create(t *testing.T) {
 	}
 }
 
+func TestTodoRepository_BulkCreate(t *testing.T) {
+	pool := setupTestDB(t)
+	repo := NewTodoRepository(pool)
+	ctx := context.Background()
+
+	items := []BulkCreateInput{
+		{Title: "Task 1", Description: "First"},
+		{Title: "Task 2", Description: "Second"},
+		{Title: "Task 3", Description: "Third"},
+	}
+
+	todos, err := repo.BulkCreate(ctx, items)
+	if err != nil {
+		t.Fatalf("BulkCreate failed: %v", err)
+	}
+
+	if len(todos) != 3 {
+		t.Fatalf("expected 3 todos, got %d", len(todos))
+	}
+	for i, todo := range todos {
+		if todo.Id == 0 {
+			t.Errorf("todo %d: expected generated ID, got 0", i)
+		}
+	}
+}
+
 func TestTodoRepository_GetByID_NotFound(t *testing.T) {
 	pool := setupTestDB(t)
 	repo := NewTodoRepository(pool)

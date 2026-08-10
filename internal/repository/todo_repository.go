@@ -18,6 +18,11 @@ type TodoRepository struct {
 	db *pgxpool.Pool
 }
 
+type BulkCreateInput struct {
+	Title       string
+	Description string
+}
+
 type PaginatedResult struct {
 	Todos      []models.Todo `json:"todos"`
 	Page       int           `json:"page"`
@@ -28,6 +33,60 @@ type PaginatedResult struct {
 
 func NewTodoRepository(db *pgxpool.Pool) *TodoRepository {
 	return &TodoRepository{db: db}
+}
+
+func (r *TodoRepository) BulkCreateCopy(ctx context.Context, items []BulkCreateInput) (int64, error) {
+	rows := make([][]any, len(items))
+	for i, item := range items {
+		rows[i] = []any{item.Title, item.Description}
+	}
+	count, err := r.db.CopyFrom(
+		ctx,
+		pgx.Identifier{"todos"},
+		[]string{"title", "description"},
+		pgx.CopyFromRows(rows),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("bulk create copy: %w", err)
+	}
+	return int64(count), nil
+}
+
+// using pgx batch query
+func (r *TodoRepository) BulkCreate(ctx context.Context, items []BulkCreateInput) ([]models.Todo, error) {
+	for len(items) == 0 {
+		return []models.Todo{}, nil
+	}
+	batch := &pgx.Batch{}
+	query := `
+				Insert into todos(title, description)
+				values($1, $2)
+				Returning id, title, description, completed, created_at, updated_at
+			`
+	for _, item := range items {
+		batch.Queue(query, item.Title, item.Description)
+	}
+
+	br := r.db.SendBatch(ctx, batch)
+	defer br.Close()
+
+	todos := make([]models.Todo, 0, len(items))
+	for range items {
+		var todo models.Todo
+		err := br.QueryRow().Scan(
+			&todo.Id,
+			&todo.Title,
+			&todo.Description,
+			&todo.Completed,
+			&todo.CreatedAt,
+			&todo.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("BulkCreate: %w", err)
+		}
+		todos = append(todos, todo)
+	}
+	return todos, nil
 }
 
 func (r *TodoRepository) Create(ctx context.Context, title, description string) (*models.Todo, error) {
