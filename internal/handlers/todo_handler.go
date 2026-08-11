@@ -4,22 +4,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
+	"github.com/hibiken/asynq"
 	"github.com/sh6210/go-todo-api/internal/models"
 	"github.com/sh6210/go-todo-api/internal/repository"
+	"github.com/sh6210/go-todo-api/internal/tasks"
 	"github.com/sh6210/go-todo-api/internal/validation"
 )
 
 type TodoHandler struct {
-	repo TodoRepositoryInterface
+	repo        TodoRepositoryInterface
+	queueClient *asynq.Client
+	logger      *slog.Logger
 }
 
-func NewTodoHandler(repo TodoRepositoryInterface) *TodoHandler {
-	return &TodoHandler{repo: repo}
+func NewTodoHandler(repo TodoRepositoryInterface, queueClient *asynq.Client, logger *slog.Logger) *TodoHandler {
+	return &TodoHandler{repo: repo, queueClient: queueClient, logger: logger}
 }
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
@@ -77,6 +82,13 @@ func (h *TodoHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	task, err := tasks.NewNotifyTodoCreatedTask(todo.Id, todo.Title)
+	if err != nil {
+		h.logger.Error("failed to build notification task", "error", err, "todo_id", todo.Id)
+	} else if _, err := h.queueClient.Enqueue(task); err != nil {
+		h.logger.Error("failed to enqueue notification task", "error", err, "todo_id", todo.Id)
 	}
 
 	respondJSON(w, http.StatusCreated, todo)

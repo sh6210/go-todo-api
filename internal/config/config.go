@@ -10,6 +10,7 @@ import (
 type Config struct {
 	DatabaseURL string
 	Port        string
+	RedisAddr   string
 }
 
 func Load() *Config {
@@ -20,6 +21,7 @@ func Load() *Config {
 	cfg := &Config{
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		Port:        getEnv("PORT", ""),
+		RedisAddr:   getEnv("REDIS_ADDR", ""),
 	}
 
 	if cfg.DatabaseURL == "" || cfg.Port == "" {
